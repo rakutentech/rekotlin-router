@@ -1,5 +1,5 @@
 
-# ReKotlin-Router [![Build Status](https://travis-ci.org/ReKotlin/rekotlin-router.svg?branch=master)](https://travis-ci.org/ReKotlin/rekotlin-router) [![License MIT](https://img.shields.io/badge/license-MIT-blue.svg?style=flat-square)](https://github.com/ReKotlin/rekotlin-router/blob/master/LICENSE.md) [ ![Download](https://api.bintray.com/packages/kmmraj/rekotlin-router/rekotlin-router/images/download.svg?version=0.1.8) ](https://bintray.com/kmmraj/rekotlin-router/rekotlin-router/0.1.8/link)
+# ReKotlin-Router [![Build Status](https://travis-ci.org/ReKotlin/rekotlin-router.svg?branch=master)](https://travis-ci.org/ReKotlin/rekotlin-router) [![License MIT](https://img.shields.io/badge/license-MIT-blue.svg?style=flat-square)](https://github.com/ReKotlin/rekotlin-router/blob/master/LICENSE.md) [ ![Download](https://api.bintray.com/packages/rekotlin/rekotlin-router/rekotlin-router/images/download.svg?version=0.2.0) ](https://bintray.com/rekotlin/rekotlin-router/rekotlin-router/0.2.0/link)
 
 A declarative router for [ReKotlin](https://github.com/GeoThings/ReKotlin). Allows developers to declare routes in a similar manner as URLs are used on the web.
 
@@ -26,7 +26,7 @@ Add the following line along with ReKotlin dependencies in gradle file
 #### Version compatible with ReKotlin 1.0.0 +
 
 ```Groovy
-implementation 'org.rekotlinrouter:rekotlin-router:0.1.9'
+implementation 'org.rekotlinrouter:rekotlin-router:0.2.0'
 ```
 
 #### Version compatible with ReKotlin version less than 1.0.0
