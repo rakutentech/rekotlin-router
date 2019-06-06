@@ -24,355 +24,309 @@ class FakeAppState : StateType {
 
 fun appReducer(action: Action, state: FakeAppState?): FakeAppState {
     val fakeAppState = FakeAppState()
-    fakeAppState.navigationState = NavigationReducer.handleAction(action, state?.navigationState)
+    fakeAppState.navigationState = navigationReducer(action, state?.navigationState)
     return fakeAppState
 }
 
 class MockRoutable : Routable {
 
-    var callsToPushRouteSegment: Array<Pair<RouteElementIdentifier, Boolean>> = emptyArray()
-    var callsToPopRouteSegment: Array<Pair<RouteElementIdentifier, Boolean>> = emptyArray()
-    var callsToChangeRouteSegment: Array<Triple<RouteElementIdentifier, RouteElementIdentifier, Boolean>> = emptyArray()
+    var callsToPushRouteSegment: Array<Pair<RouteSegment, Boolean>> = emptyArray()
+    var callsToPopRouteSegment: Array<Pair<RouteSegment, Boolean>> = emptyArray()
+    var callsToChangeRouteSegment: Array<Triple<RouteSegment, RouteSegment, Boolean>> = emptyArray()
 
-    override fun pushRouteSegment(routeElementIdentifier: RouteElementIdentifier, animated: Boolean, completionHandler: RoutingCompletionHandler): Routable {
-        callsToPushRouteSegment = callsToPushRouteSegment.plus(Pair(routeElementIdentifier, animated))
+    override fun pushRouteSegment(routeSegment: RouteSegment, animated: Boolean, completionHandler: () -> Unit): Routable {
+        callsToPushRouteSegment = callsToPushRouteSegment.plus(Pair(routeSegment, animated))
         completionHandler()
         return MockRoutable()
     }
 
-    override fun popRouteSegment(routeElementIdentifier: RouteElementIdentifier, animated: Boolean, completionHandler: RoutingCompletionHandler) {
-        callsToPopRouteSegment = callsToPopRouteSegment.plus(Pair(routeElementIdentifier, animated))
+    override fun popRouteSegment(routeSegment: RouteSegment, animated: Boolean, completionHandler: () -> Unit) {
+        callsToPopRouteSegment = callsToPopRouteSegment.plus(Pair(routeSegment, animated))
         completionHandler()
     }
 
-    override fun changeRouteSegment(from: RouteElementIdentifier, to: RouteElementIdentifier, animated: Boolean, completionHandler: RoutingCompletionHandler): Routable {
+    override fun changeRouteSegment(from: RouteSegment, to: RouteSegment, animated: Boolean, completionHandler: () -> Unit): Routable {
         callsToChangeRouteSegment = callsToChangeRouteSegment.plus(Triple(from, to, animated))
         completionHandler()
         return MockRoutable()
     }
 }
 
-//@PrepareForTest(Looper::class)
-//@RunWith(PowerMockRunner::class)
-class ReKotlinRouterIntegerationTests {
 
-    @PrepareForTest(Looper::class)
-    @RunWith(PowerMockRunner::class)
-    class RoutingCallTest {
+@PrepareForTest(Looper::class)
+@RunWith(PowerMockRunner::class)
+class RoutingCallTest {
 
-        var store: Store<FakeAppState> = Store(reducer = ::appReducer, state = FakeAppState())
+    var store: Store<FakeAppState> = Store(reducer = ::appReducer, state = FakeAppState())
 
-        @Before
-        @PrepareForTest(Looper::class, Handler::class, Router::class)
-        fun initTest() {
-            store = Store(reducer = ::appReducer, state = FakeAppState())
-            AndroidMockUtil.mockMainThreadHandler()
+    @Before
+    @PrepareForTest(Looper::class, Handler::class, Router::class)
+    fun initTest() {
+        store = Store(reducer = ::appReducer, state = FakeAppState())
+        AndroidMockUtil.mockMainThreadHandler()
+    }
+
+    @Test
+    fun should_not_request_the_main_activity_when_no_route_is_provided() {
+
+        class FakeRootRoutable : Routable {
+            var pushRouteIsCalled = false
+
+            override fun pushRouteSegment(routeSegment: RouteSegment, animated: Boolean, completionHandler: () -> Unit): Routable {
+                pushRouteIsCalled = true
+                return MockRoutable()
+            }
+
+            override fun popRouteSegment(routeSegment: RouteSegment, animated: Boolean, completionHandler: () -> Unit) {}
+
+            override fun changeRouteSegment(from: RouteSegment, to: RouteSegment, animated: Boolean, completionHandler: () -> Unit) = this
         }
 
-        @Test
-        // @DisplayName("does not request the main activity when no route is provided")
-        fun test_no_request_main_activity_when_no_route_provided() {
+        // Given
+        val routable = FakeRootRoutable()
+        // When
+        Router(store, routable) { subscription ->
+            subscription.select { stateType -> stateType.navigationState }
+        }
+        // Then
+        assertThat(routable.pushRouteIsCalled).isFalse()
+    }
 
-            class FakeRootRoutable : Routable {
-                var pushRouteIsCalled = false
+    @Test
+    fun should_request_the_root_with_identifier_when_an_initial_route_is_provided() {
 
-                override fun pushRouteSegment(routeElementIdentifier: RouteElementIdentifier, animated: Boolean, completionHandler: RoutingCompletionHandler): Routable {
-                    pushRouteIsCalled = true
-                    return MockRoutable()
-                }
+        // Given
 
-                override fun popRouteSegment(routeElementIdentifier: RouteElementIdentifier, animated: Boolean, completionHandler: RoutingCompletionHandler) {
-                    TODO("not implemented") //To change body of created functions use File | Settings | File Templates.
-                }
+        // The below syntax is not supported by powermock 😟
+        // store.dispatch(SetRouteAction(arrayOf("MainActivity")))
+        // https://github.com/powermock/powermock/issues/779
+        // Until then
+        val actionArray = simpleRoute("MainActivity")
+        val action = SetRouteAction(actionArray)
+        store.dispatch(action)
 
-                override fun changeRouteSegment(from: RouteElementIdentifier, to: RouteElementIdentifier, animated: Boolean, completionHandler: RoutingCompletionHandler): Routable {
-                    TODO("not implemented") //To change body of created functions use File | Settings | File Templates.
-                }
+        class FakeRootRoutable(val calledWithIdentifier: (RouteSegment?) -> Any) : Routable {
+            var pushRouteIsCalled = false
+
+            override fun pushRouteSegment(routeSegment: RouteSegment,
+                                          animated: Boolean,
+                                          completionHandler: () -> Unit): Routable {
+                calledWithIdentifier(routeSegment)
+                completionHandler()
+                pushRouteIsCalled = true
+                return MockRoutable()
             }
 
-            // Given
-            val routable = FakeRootRoutable()
-            // When
-            Router(store = store, rootRoutable = routable) { subscription ->
-                subscription.select { stateType -> stateType.navigationState }
-            }
-            // Then
-            assertThat(routable.pushRouteIsCalled).isFalse()
+            override fun popRouteSegment(routeSegment: RouteSegment, animated: Boolean, completionHandler: () -> Unit) {}
+
+            override fun changeRouteSegment(from: RouteSegment, to: RouteSegment, animated: Boolean, completionHandler: () -> Unit) = this
         }
 
-        //@DisplayName("requests the root with identifier when an initial route is provided")
-        @Test
-        fun test_requests_the_root_with_identifier_when_initial_route_provided() {
+        // Then
 
-            // Given
-
-            // The below syntax is not supported by powermock 😟
-            // store.dispatch(SetRouteAction(arrayOf("MainActivity")))
-            // https://github.com/powermock/powermock/issues/779
-            // Until then
-            val actionArray = arrayListOf("MainActivity")
-            val action = SetRouteAction(actionArray)
-            store.dispatch(action)
-
-            class FakeRootRoutable(calledWithIdentifier: (RouteElementIdentifier?) -> Any) : Routable {
-                var pushRouteIsCalled = false
-                var calledWithIdentifier: ((RouteElementIdentifier?) -> Any)
-
-                init {
-                    this.calledWithIdentifier = calledWithIdentifier
-                }
-
-                override fun pushRouteSegment(routeElementIdentifier: RouteElementIdentifier,
-                                              animated: Boolean,
-                                              completionHandler: RoutingCompletionHandler): Routable {
-                    calledWithIdentifier(routeElementIdentifier)
-                    completionHandler()
-                    pushRouteIsCalled = true
-                    return MockRoutable()
-                }
-
-                override fun popRouteSegment(routeElementIdentifier: RouteElementIdentifier, animated: Boolean, completionHandler: RoutingCompletionHandler) {
-                    TODO("not implemented") //To change body of created functions use File | Settings | File Templates.
-                }
-
-                override fun changeRouteSegment(from: RouteElementIdentifier, to: RouteElementIdentifier, animated: Boolean, completionHandler: RoutingCompletionHandler): Routable {
-                    TODO("not implemented") //To change body of created functions use File | Settings | File Templates.
-                }
-            }
-
-            // Then
-
-            await().atMost(5, TimeUnit.SECONDS).untilAsserted {
-                object : Runnable {
-
-                    override fun run() {
-                        var isRootElementCalled: Boolean = false
-                        val rootRoutable = FakeRootRoutable { rootElementId: RouteElementIdentifier? ->
-                            {
-                                isRootElementCalled = rootElementId.equals("MainActivity")
-                            }
-                        }
-
-                        Router(store = store, rootRoutable = rootRoutable) { subscription ->
-                            subscription.select { stateType -> stateType.navigationState }
-                        }
-                        println("The value of isRootElementCalled is ${isRootElementCalled}")
-                        assertThat(isRootElementCalled).isTrue()
+        await().atMost(5, TimeUnit.SECONDS).untilAsserted {
+            Runnable {
+                var isRootElementCalled = false
+                val rootRoutable = FakeRootRoutable { rootSegment: RouteSegment? ->
+                    {
+                        isRootElementCalled = rootSegment?.id.equals("MainActivity")
                     }
                 }
-            }
-        }
 
-        @Test
-        //@Display("calls push on the root for a route with two elements")
-        fun test_push_on_root_with_2_elements() {
-
-            val actionArray = arrayListOf("MainActivity", "SecondActivity")
-            val action = SetRouteAction(actionArray)
-            store.dispatch(action)
-
-            class FakeChildRoutable(calledWithIdentifier: (RouteElementIdentifier?) -> Any) : Routable {
-                var pushRouteIsCalled = false
-                var calledWithIdentifier: ((RouteElementIdentifier?) -> Any)
-
-                init {
-                    this.calledWithIdentifier = calledWithIdentifier
+                Router(store = store, rootRoutable = rootRoutable) { subscription ->
+                    subscription.select { stateType -> stateType.navigationState }
                 }
-
-                override fun pushRouteSegment(routeElementIdentifier: RouteElementIdentifier,
-                                              animated: Boolean,
-                                              completionHandler: RoutingCompletionHandler): Routable {
-                    calledWithIdentifier(routeElementIdentifier)
-                    completionHandler()
-                    pushRouteIsCalled = true
-                    return MockRoutable()
-                }
-
-                override fun popRouteSegment(routeElementIdentifier: RouteElementIdentifier, animated: Boolean, completionHandler: RoutingCompletionHandler) {
-                    TODO("Empty Implementation")
-                }
-
-                override fun changeRouteSegment(from: RouteElementIdentifier, to: RouteElementIdentifier, animated: Boolean, completionHandler: RoutingCompletionHandler): Routable {
-                    TODO("Empty Implementation")
-                }
-            }
-
-            class FakeRootRoutable(var injectedRoutable: Routable) : Routable {
-                var pushRouteIsCalled = false
-                var rootRoutableIsCorrect = false
-                var routeRootElementIdentifier: RouteElementIdentifier = ""
-
-                override fun pushRouteSegment(routeElementIdentifier: RouteElementIdentifier,
-                                              animated: Boolean,
-                                              completionHandler: RoutingCompletionHandler): Routable {
-                    completionHandler()
-                    pushRouteIsCalled = true
-
-                    rootRoutableIsCorrect = routeElementIdentifier == "MainActivity"
-                    return injectedRoutable
-                }
-
-                override fun popRouteSegment(routeElementIdentifier: RouteElementIdentifier, animated: Boolean, completionHandler: RoutingCompletionHandler) {
-                    TODO("not implemented") //To change body of created functions use File | Settings | File Templates.
-                }
-
-                override fun changeRouteSegment(from: RouteElementIdentifier, to: RouteElementIdentifier, animated: Boolean, completionHandler: RoutingCompletionHandler): Routable {
-                    TODO("not implemented") //To change body of created functions use File | Settings | File Templates.
-                }
-            }
-
-            // Then
-
-            await().atMost(5, TimeUnit.SECONDS).untilAsserted {
-                object : Runnable {
-
-
-                    override fun run() {
-                        var isChildIdentifierCorrect: Boolean = false
-                        val fakeChildRoutable = FakeChildRoutable { calledWithIdentifier: RouteElementIdentifier? ->
-                            {
-                                isChildIdentifierCorrect = calledWithIdentifier.equals("SecondActivity")
-                            }
-                        }
-
-                        val fakeRootRoutable = FakeRootRoutable(injectedRoutable = fakeChildRoutable)
-
-                        Router(store = store, rootRoutable = fakeRootRoutable) { subscription ->
-                            subscription.select { stateType -> stateType.navigationState }
-                        }
-                        println("The value of isIdentifierCorrect is ${isChildIdentifierCorrect}")
-                        println("The value of rootRouteElementIdentifier is ${fakeRootRoutable.routeRootElementIdentifier}")
-                        // Then
-                        // Assert
-                        assertThat(isChildIdentifierCorrect && fakeRootRoutable.rootRoutableIsCorrect).isTrue()
-                    }
-                }
+                println("The value of isRootElementCalled is $isRootElementCalled")
+                assertThat(isRootElementCalled).isTrue()
             }
         }
     }
 
-    @PrepareForTest(Looper::class, Handler::class)
+    @Test
+    fun should_call_push_on_the_root_for_a_route_with_two_elements() {
+
+        val actionArray = simpleRoute("MainActivity", "SecondActivity")
+        val action = SetRouteAction(actionArray)
+        store.dispatch(action)
+
+        class FakeChildRoutable(var calledWithIdentifier: (RouteSegment?) -> Any) : Routable {
+            var pushRouteIsCalled = false
+
+            override fun pushRouteSegment(routeSegment: RouteSegment,
+                                          animated: Boolean,
+                                          completionHandler: () -> Unit): Routable {
+                calledWithIdentifier(routeSegment)
+                completionHandler()
+                pushRouteIsCalled = true
+                return MockRoutable()
+            }
+
+            override fun popRouteSegment(routeSegment: RouteSegment, animated: Boolean, completionHandler: () -> Unit) {}
+
+            override fun changeRouteSegment(from: RouteSegment, to: RouteSegment, animated: Boolean, completionHandler: () -> Unit) = this
+        }
+
+        class FakeRootRoutable(var injectedRoutable: Routable) : Routable {
+            var pushRouteIsCalled = false
+            var rootRoutableIsCorrect = false
+            var routeRootElementIdentifier = RouteSegment("")
+
+            override fun pushRouteSegment(routeSegment: RouteSegment,
+                                          animated: Boolean,
+                                          completionHandler: () -> Unit): Routable {
+                completionHandler()
+                pushRouteIsCalled = true
+
+                rootRoutableIsCorrect = routeSegment.id == "MainActivity"
+                return injectedRoutable
+            }
+
+            override fun popRouteSegment(routeSegment: RouteSegment, animated: Boolean, completionHandler: () -> Unit) {}
+
+            override fun changeRouteSegment(from: RouteSegment, to: RouteSegment, animated: Boolean, completionHandler: () -> Unit) = this
+        }
+
+        // Then
+
+        await().atMost(5, TimeUnit.SECONDS).untilAsserted {
+            object : Runnable {
+
+
+                override fun run() {
+                    var isChildIdentifierCorrect = false
+                    val fakeChildRoutable = FakeChildRoutable { calledWithIdentifier: RouteSegment? ->
+                        {
+                            isChildIdentifierCorrect = calledWithIdentifier?.id.equals("SecondActivity")
+                        }
+                    }
+
+                    val fakeRootRoutable = FakeRootRoutable(injectedRoutable = fakeChildRoutable)
+
+                    Router(store = store, rootRoutable = fakeRootRoutable) { subscription ->
+                        subscription.select { stateType -> stateType.navigationState }
+                    }
+                    println("The value of isIdentifierCorrect is $isChildIdentifierCorrect")
+                    println("The value of rootRouteElementIdentifier is ${fakeRootRoutable.routeRootElementIdentifier}")
+                    // Then
+                    // Assert
+                    assertThat(isChildIdentifierCorrect && fakeRootRoutable.rootRoutableIsCorrect).isTrue()
+                }
+            }
+        }
+    }
+}
+
+@PrepareForTest(Looper::class, Handler::class)
+@RunWith(PowerMockRunner::class)
+class RoutingSpecificDataTest {
+
+    var store: Store<FakeAppState> = Store(reducer = ::appReducer, state = null)
+
+    @Before
+    @PrepareForTest(Looper::class)
+    fun initTest() {
+        store = Store(reducer = ::appReducer, state = null)
+        AndroidMockUtil.mockMainThreadHandler()
+    }
+
+    @Test
+    fun should_allow_accessing_the_data_when_providing_the_expected_type() {
+
+        //Given
+
+        val actionArray = simpleRoute("MainActivity", "SecondActivity")
+        val actionData = SetRouteSpecificData(route = actionArray, data = "UserID_10")
+        // When
+        store.dispatch(actionData)
+
+        // Then
+        val data: String? = store.state.navigationState.getRouteSpecificState(actionArray)
+
+        await().atMost(5, TimeUnit.SECONDS).untilAsserted {
+            Runnable {
+                // Assert
+                assertThat(data).isEqualTo("UserID_10")
+            }
+        }
+    }
+
+    @PrepareForTest(Looper::class, Handler::class, Router::class)
     @RunWith(PowerMockRunner::class)
-    class RoutingSpecificDataTest {
+    class RoutingAnimationTest {
 
         var store: Store<FakeAppState> = Store(reducer = ::appReducer, state = null)
+        var mockRoutable: MockRoutable = MockRoutable()
+        var router: Router<FakeAppState>? = null
 
         @Before
-        @PrepareForTest(Looper::class)
+        @PrepareForTest(Looper::class, Handler::class, Router::class)
         fun initTest() {
-            store = Store(reducer = ::appReducer, state = null)
             AndroidMockUtil.mockMainThreadHandler()
+            store = Store(reducer = ::appReducer, state = null)
+            mockRoutable = MockRoutable()
+
+            router = Router(store = store,
+                    rootRoutable = mockRoutable) { subscription ->
+                subscription.select { stateType ->
+                    stateType.navigationState
+                }
+            }
         }
 
-        //@DisplayName("allows accessing the data when providing the expected type")
         @Test
-        fun test_allow_accessing_data_when_expected_type_provided() {
-
+        fun should_request_animation_when_dispatch_route_change_with_animate_as_true() {
             //Given
+            val actionArray = simpleRoute("MainActivity", "SecondActivity")
+            val action = SetRouteAction(actionArray, animated = true)
 
-            val actionArray = arrayListOf("MainActivity", "SecondActivity")
-            val actionData = SetRouteSpecificData(route = actionArray, data = "UserID_10")
             // When
-            store.dispatch(actionData)
+            store.dispatch(action)
 
             // Then
-            val data: String? = store.state.navigationState.getRouteSpecificState(actionArray)
-
             await().atMost(5, TimeUnit.SECONDS).untilAsserted {
                 object : Runnable {
+                    @PrepareForTest(Looper::class, Handler::class)
                     override fun run() {
                         // Assert
-                        assertThat(data).isEqualTo("UserID_10")
+                        assertThat(mockRoutable.callsToPushRouteSegment.last().second).isTrue()
                     }
                 }
             }
         }
 
-        @PrepareForTest(Looper::class, Handler::class, Router::class)
-        @RunWith(PowerMockRunner::class)
-        class RoutingAnimationTest {
+        @Test
+        fun should_not_request_animation_when_route_change_with_animate_is_false() {
+            //Given
+            val actionArray = simpleRoute("MainActivity", "SecondActivity")
+            val action = SetRouteAction(actionArray, animated = false)
+            // When
+            store.dispatch(action)
 
-            var store: Store<FakeAppState> = Store(reducer = ::appReducer, state = null)
-            var mockRoutable: MockRoutable = MockRoutable()
-            var router: Router<FakeAppState>? = null
+            // Then
 
-            @Before
-            @PrepareForTest(Looper::class, Handler::class, Router::class)
-            fun initTest() {
-                AndroidMockUtil.mockMainThreadHandler()
-                store = Store(reducer = ::appReducer, state = null)
-                mockRoutable = MockRoutable()
-
-                router = Router(store = store,
-                        rootRoutable = mockRoutable) { subscription ->
-                    subscription.select { stateType ->
-                        stateType.navigationState
-                    }
+            await().atMost(5, TimeUnit.SECONDS).untilAsserted {
+                Runnable {
+                    // Assert
+                    assertThat(mockRoutable.callsToPushRouteSegment.last().second).isFalse()
                 }
             }
+        }
 
-            @Test
-            // @DisplayName("when dispatching an animated route change")
-            fun test_dipatching_animated_route_change_with_animate_as_true() {
-                //Given
+        @Test
+        fun should_request_animation_by_default() {
+            //Given
 
-                val actionArray = arrayListOf("MainActivity", "SecondActivity")
-                val action = SetRouteAction(actionArray, animated = true)
-                // When
-                store.dispatch(action)
+            val actionArray = simpleRoute("MainActivity", "SecondActivity")
+            val action = SetRouteAction(actionArray)
+            // When
+            store.dispatch(action)
 
-                // Then
+            // Then
 
-                await().atMost(5, TimeUnit.SECONDS).untilAsserted {
-                    object : Runnable {
-                        @PrepareForTest(Looper::class, Handler::class)
-                        override fun run() {
-                            // Assert
-                            assertThat(mockRoutable.callsToPushRouteSegment.last().second).isTrue()
-                        }
-                    }
-                }
-            }
-
-            @Test // @DisplayName("when dispatching an unanimated route change")
-            fun test_dipatching_animated_route_change_with_animate_as_false() {
-                //Given
-
-                val actionArray = arrayListOf("MainActivity", "SecondActivity")
-                val action = SetRouteAction(actionArray, animated = false)
-                // When
-                store.dispatch(action)
-
-                // Then
-
-                await().atMost(5, TimeUnit.SECONDS).untilAsserted {
-                    object : Runnable {
-                        override fun run() {
-                            // Assert
-                            assertThat(mockRoutable.callsToPushRouteSegment.last().second).isFalse()
-                        }
-                    }
-                }
-            }
-
-            @Test // @DisplayName("when dispatching an default route change")
-            fun test_dipatching_animated_route_change_with_animate_with_default() {
-                //Given
-
-                val actionArray = arrayListOf("MainActivity", "SecondActivity")
-                val action = SetRouteAction(actionArray)
-                // When
-                store.dispatch(action)
-
-                // Then
-
-                await().atMost(5, TimeUnit.SECONDS).untilAsserted {
-                    object : Runnable {
-                        override fun run() {
-                            // Assert
-                            assertThat(mockRoutable.callsToPushRouteSegment.last().second).isTrue()
-                        }
-                    }
+            await().atMost(5, TimeUnit.SECONDS).untilAsserted {
+                Runnable {
+                    // Assert
+                    assertThat(mockRoutable.callsToPushRouteSegment.last().second).isTrue()
                 }
             }
         }

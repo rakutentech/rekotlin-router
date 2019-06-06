@@ -60,3 +60,5 @@ object AndroidMockUtil {
 
     private val mainThread = Executors.newSingleThreadScheduledExecutor()
 }
+
+fun simpleRoute(vararg segments: String): Route = segments.map { RouteSegment(it) }

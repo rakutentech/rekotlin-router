@@ -1,25 +1,19 @@
 package org.rekotlinrouter
 
-class FullRoute(route: Route) {
-    val routeString: String
+val Route.routeString get(): String = this.map { it.id }.joinToString(separator = "/")
 
-    init {
-        this.routeString = route.joinToString(separator = "/")
-    }
-}
-
-data class NavigationState(var route: Route = arrayListOf(),
-                           var routeSpecificState: HashMap<String, Any> = HashMap(),
-                           var changeRouteAnimated: Boolean = true) {
+data class NavigationState(val route: Route = arrayListOf(),
+                           val routeSpecificState: HashMap<String, Any> = HashMap(),
+                           val changeRouteAnimated: Boolean = true) {
 
     fun <T> getRouteSpecificState(givenRoutes: Route): T? {
-        val fullroute = FullRoute(givenRoutes)
-        val routeString = fullroute.routeString
+        val routeString = givenRoutes.routeString
 
         return routeSpecificState[routeString] as? T
     }
 }
 
+@Suppress("unused") // part of public API
 interface HasNavigationState {
     var navigationState: NavigationState
 }

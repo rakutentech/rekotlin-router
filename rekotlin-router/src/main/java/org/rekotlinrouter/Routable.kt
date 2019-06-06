@@ -1,23 +1,23 @@
 package org.rekotlinrouter
 
-typealias RoutingCompletionHandler = () -> Unit
 
-typealias RouteElementIdentifier = String
-typealias Route = List<RouteElementIdentifier>
+typealias Route = List<RouteSegment>
+
+data class RouteSegment(val id: String, val args: Any? = null)
 
 
 interface Routable {
 
-    fun pushRouteSegment(routeElementIdentifier: RouteElementIdentifier,
-                         animated: Boolean,
-                         completionHandler: RoutingCompletionHandler): Routable
+    fun pushRouteSegment(routeSegment: RouteSegment,
+                         animated: Boolean = false,
+                         completionHandler: () -> Unit = {}): Routable
 
-    fun popRouteSegment(routeElementIdentifier: RouteElementIdentifier,
-                        animated: Boolean,
-                        completionHandler: RoutingCompletionHandler)
+    fun popRouteSegment(routeSegment: RouteSegment,
+                        animated: Boolean = false,
+                        completionHandler: () -> Unit = {})
 
-    fun changeRouteSegment(from: RouteElementIdentifier,
-                           to: RouteElementIdentifier,
-                           animated: Boolean,
-                           completionHandler: RoutingCompletionHandler): Routable
+    fun changeRouteSegment(from: RouteSegment,
+                           to: RouteSegment,
+                           animated: Boolean = false,
+                           completionHandler: () -> Unit = {}): Routable
 }

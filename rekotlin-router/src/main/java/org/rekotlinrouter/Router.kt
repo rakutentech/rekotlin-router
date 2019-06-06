@@ -11,10 +11,10 @@ import org.rekotlin.Subscription
 // TODO: Check is this need to be a singleton ?
 sealed class RoutingAction
 
-data class push(val responsibleRoutableIndex: Int, val segmentToBePushed: RouteElementIdentifier) : RoutingAction()
-data class pop(val responsibleRoutableIndex: Int, val segmentToBePopped: RouteElementIdentifier) : RoutingAction()
-data class change(val responsibleRoutableIndex: Int, val segmentToBeReplaced: RouteElementIdentifier,
-                  val newSegment: RouteElementIdentifier) : RoutingAction()
+data class push(val responsibleRoutableIndex: Int, val segmentToBePushed: RouteSegment) : RoutingAction()
+data class pop(val responsibleRoutableIndex: Int, val segmentToBePopped: RouteSegment) : RoutingAction()
+data class change(val responsibleRoutableIndex: Int, val segmentToBeReplaced: RouteSegment,
+                  val newSegment: RouteSegment) : RoutingAction()
 
 
 class Router<routerStateType : StateType>(var store: Store<routerStateType>,
@@ -51,28 +51,29 @@ class Router<routerStateType : StateType>(var store: Store<routerStateType>,
 
                 is pop -> {
                     mainThreadHandler.post {
-                        this.routables[routingAction.responsibleRoutableIndex]
-                                .popRouteSegment(routeElementIdentifier = routingAction.segmentToBePopped,
-                                        animated = state.changeRouteAnimated) {}
-                        this.routables.removeAt(routingAction.responsibleRoutableIndex + 1)
+                        routables[routingAction.responsibleRoutableIndex]
+                                .popRouteSegment(routingAction.segmentToBePopped, state.changeRouteAnimated)
+                        routables.removeAt(routingAction.responsibleRoutableIndex + 1)
                     }
                 }
 
                 is push -> {
                     mainThreadHandler.post {
-                        val newRoutable = this.routables[routingAction.responsibleRoutableIndex].pushRouteSegment(routeElementIdentifier = routingAction.segmentToBePushed,
-                                animated = state.changeRouteAnimated) {}
-                        this.routables.add(newRoutable)
+                        val newRoutable =
+                                routables[routingAction.responsibleRoutableIndex].pushRouteSegment(
+                                        routingAction.segmentToBePushed, state.changeRouteAnimated)
+                        routables.add(newRoutable)
                     }
 
                 }
 
                 is change -> {
                     mainThreadHandler.post {
-                        this.routables[routingAction.responsibleRoutableIndex + 1] =
-                                this.routables[routingAction.responsibleRoutableIndex].changeRouteSegment(from = routingAction.segmentToBeReplaced,
+                        routables[routingAction.responsibleRoutableIndex + 1] =
+                                routables[routingAction.responsibleRoutableIndex].changeRouteSegment(
+                                        from = routingAction.segmentToBeReplaced,
                                         to = routingAction.newSegment,
-                                        animated = state.changeRouteAnimated) {}
+                                        animated = state.changeRouteAnimated)
                     }
                 }
             }

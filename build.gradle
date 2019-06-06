@@ -5,7 +5,7 @@ buildscript {
         dokka_version = '0.9.18'
         rekotlin_version = '1.0.3'
         gradle_bintray_plugin_version = "1.8.4"
-        android_tools_build_gradle_version = "3.4.0"
+        android_tools_build_gradle_version = "3.4.1"
         junit_version = "4.12"
         mockito_core_version = "1.10.19"
         assertj_core_version = "3.6.2"
@@ -35,8 +35,4 @@ allprojects {
         jcenter()
         mavenCentral()
     }
-}
-
-task clean(type: Delete) {
-    delete rootProject.buildDir
 }
