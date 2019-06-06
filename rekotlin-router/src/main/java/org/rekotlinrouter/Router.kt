@@ -38,13 +38,13 @@ class Router<routerStateType : StateType>(var store: Store<routerStateType>,
         val routingActions = routingActionsForTransitionFrom(lastNavigationState.route, state.route)
         if (routingActions.size > 0) {
             routingActions.forEach { routingAction ->
-                routingSerailActionHandler(routingAction, state)
+                routingSerialActionHandler(routingAction, state)
             }
             lastNavigationState = state.copy()
         }
     }
 
-    private fun routingSerailActionHandler(routingAction: RoutingAction, state: NavigationState) {
+    private fun routingSerialActionHandler(routingAction: RoutingAction, state: NavigationState) {
 
         synchronized(lock = routables) {
             when (routingAction) {
