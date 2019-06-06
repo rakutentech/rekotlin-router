@@ -24,14 +24,15 @@ class Router<routerStateType : StateType>(var store: Store<routerStateType>,
     var lastNavigationState = NavigationState()
     // TODO: Collections.synchronizedList vs CopyOnWriteArrayList
     // var routables: List<Routable> = Collections.synchronizedList(arrayListOf<Routable>())
-    var routables: ArrayList<Routable> = arrayListOf()
+    val routables: ArrayList<Routable> = arrayListOf()
+
+    // ensure mainThreadHandler initialization before subscribing to the store
+    private val mainThreadHandler: Handler = Handler(Looper.getMainLooper())
 
     init {
         this.routables.add(rootRoutable)
         this.store.subscribe(this, stateTransform)
     }
-
-    private val mainThreadHandler = Handler(Looper.getMainLooper())
 
     override fun newState(state: NavigationState) {
         val routingActions = routingActionsForTransitionFrom(lastNavigationState.route, state.route)
