@@ -1,178 +1,126 @@
 package org.rekotlinrouter
 
-
-import org.assertj.core.api.Assertions.assertThat
+import org.amshove.kluent.shouldBe
+import org.amshove.kluent.shouldBeInstanceOf
+import org.amshove.kluent.shouldEqual
+import org.amshove.kluent.shouldNotBeNull
 import org.junit.Test
 
 internal class ReKotlinRouterSpec {
 
-    private val mainSegmentId = "MainSegment"
-    private val counterSegmentId = "CounterSegment"
-    private val statsSegmentId = "StatsSegment"
-    private val infoSegmentId = "InfoSegment"
+    private val root = "root"
+    private val counter = "counter"
+    private val stats = "stats"
+    private val info = "info"
 
     @Test
     fun `should calculate transitions from an empty route to a multi segment route`() {
-
         // Given
         val oldRoute: Route = emptyList()
-        val newRoute = simpleRoute(mainSegmentId, statsSegmentId)
+        val newRoute = simpleRoute(root, stats)
 
         // When
-        val routingActions = Router.routingActionsForTransitionFrom(oldRoute, newRoute)
+        val routingActions = routingActionsForTransitionFrom(oldRoute, newRoute)
 
         // Then
-        var action1Correct = false
-        var action2Correct = false
-
-        routingActions.forEach { routingAction ->
-            when (routingAction) {
-                is push -> {
-                    if (routingAction.responsibleRoutableIndex == 0 && routingAction.segmentToBePushed.id == mainSegmentId) {
-                        action1Correct = true
-                    }
-                    if (routingAction.responsibleRoutableIndex == 1 && routingAction.segmentToBePushed.id == statsSegmentId) {
-                        action2Correct = true
-                    }
-                }
-            }
+        routingActions.count() shouldBe 2
+        val pushes = routingActions.map {
+            it shouldBeInstanceOf Push::class
+            it as Push
         }
-        assertThat(action1Correct).isTrue()
-        assertThat(action2Correct).isTrue()
-        assertThat(routingActions.count()).isEqualTo(2)
+        pushes[0].routableIndex shouldEqual 0
+        pushes[0].segmentToPush shouldHaveId root
+
+        pushes[1].routableIndex shouldEqual 1
+        pushes[1].segmentToPush shouldHaveId stats
     }
 
     @Test
     fun `should generate a change action on the last common subroute`() {
-
         // Given
-        val oldRoute = simpleRoute(mainSegmentId, counterSegmentId)
-        val newRoute = simpleRoute(mainSegmentId, statsSegmentId)
+        val oldRoute = simpleRoute(root, counter)
+        val newRoute = simpleRoute(root, stats)
 
         // When
-        val routingActions = Router.routingActionsForTransitionFrom(oldRoute, newRoute)
+        val routingActions = routingActionsForTransitionFrom(oldRoute, newRoute)
 
         // Then
-        var controllerIndex: Int = -1
-        var toBeReplaced = ""
-        var new = ""
-        routingActions.forEach { routingAction ->
+        val change = routingActions.find { it is Change } as? Change
 
-            when (routingAction) {
-                is change -> {
-                    controllerIndex = routingAction.responsibleRoutableIndex
-                    toBeReplaced = routingAction.segmentToBeReplaced.id
-                    new = routingAction.newSegment.id
-                }
-            }
-        }
-        assertThat(controllerIndex).isEqualTo(1)
-        assertThat(toBeReplaced).isEqualTo(counterSegmentId)
-        assertThat(new).isEqualTo(statsSegmentId)
+        change.shouldNotBeNull()
+        change.routableIndex shouldEqual 1
+        change.segmentTeReplace shouldHaveId counter
+        change.newSegment shouldHaveId stats
     }
 
     @Test
     fun `should generate a Change action on the last common subroute, also for routes of different length`() {
-
         // Given
-        val oldRoute = simpleRoute(mainSegmentId, counterSegmentId)
-        val newRoute = simpleRoute(mainSegmentId, statsSegmentId, infoSegmentId)
+        val oldRoute = simpleRoute(root, counter)
+        val newRoute = simpleRoute(root, stats, info)
 
         // When
-        val routingActions = Router.routingActionsForTransitionFrom(oldRoute, newRoute)
+        val routingActions = routingActionsForTransitionFrom(oldRoute, newRoute)
 
         // Then
-        var action1Correct = false
-        var action2Correct = false
+        routingActions.count() shouldBe 2
 
-        routingActions.forEach { routingAction ->
-            when (routingAction) {
-                is change -> {
-                    if (routingAction.responsibleRoutableIndex == 1
-                            && routingAction.segmentToBeReplaced.id == counterSegmentId
-                            && routingAction.newSegment.id == statsSegmentId) {
-                        action1Correct = true
-                    }
-                }
-                is push -> {
-                    if (routingAction.responsibleRoutableIndex == 2 && routingAction.segmentToBePushed.id == infoSegmentId) {
-                        action2Correct = true
-                    }
+        val change = routingActions.find { it is Change } as? Change
+        val push = routingActions.findLast { it is Push } as? Push
 
-                }
+        change.shouldNotBeNull()
+        change.routableIndex shouldEqual 1
+        change.segmentTeReplace shouldHaveId counter
+        change.newSegment shouldHaveId stats
 
-            }
-        }
-
-        assertThat(action1Correct).isTrue()
-        assertThat(action2Correct).isTrue()
-        assertThat(routingActions.count()).isEqualTo(2)
+        push.shouldNotBeNull()
+        push.routableIndex shouldEqual 2
+        push.segmentToPush shouldHaveId info
     }
 
     @Test
     fun `should generate a Change action on root when root element changes`() {
-
         // Given
-        val oldRoute = simpleRoute(mainSegmentId)
-        val newRoute = simpleRoute(statsSegmentId)
+        val oldRoute = simpleRoute(root)
+        val newRoute = simpleRoute(stats)
 
         // When
-        val routingActions = Router.routingActionsForTransitionFrom(oldRoute, newRoute)
+        val routingActions = routingActionsForTransitionFrom(oldRoute, newRoute)
 
         // Then
-        var controllerIndex: Int = -1
-        var toBeReplaced = ""
-        var new = ""
-        routingActions.forEach { routingAction ->
+        routingActions.count() shouldEqual 1
 
-            when (routingAction) {
-                is change -> {
-                    controllerIndex = routingAction.responsibleRoutableIndex
-                    toBeReplaced = routingAction.segmentToBeReplaced.id
-                    new = routingAction.newSegment.id
-                }
-            }
-        }
-        assertThat(controllerIndex).isEqualTo(0)
-        assertThat(routingActions.count()).isEqualTo(1)
-        assertThat(toBeReplaced).isEqualTo(mainSegmentId)
-        assertThat(new).isEqualTo(statsSegmentId)
+        val change = routingActions.find { it is Change } as? Change
+
+        change.shouldNotBeNull()
+        change.routableIndex shouldEqual 0
+        change.segmentTeReplace shouldHaveId root
+        change.newSegment shouldHaveId stats
     }
 
     @Test
     fun `should generate a pop action followed by a change action on root when whole route changes`() {
         // Given
-        val oldRoute = simpleRoute(mainSegmentId, counterSegmentId)
-        val newRoute = simpleRoute(statsSegmentId)
+        val oldRoute = simpleRoute(root, counter)
+        val newRoute = simpleRoute(stats)
 
         // When
-        val routingActions = Router.routingActionsForTransitionFrom(oldRoute, newRoute)
+        val routingActions = routingActionsForTransitionFrom(oldRoute, newRoute)
 
         // Then
-        var action1Correct = false
-        var action2Correct = false
+        routingActions.count() shouldEqual 2
 
-        routingActions.forEach { routingAction ->
-            when (routingAction) {
-                is pop -> {
-                    if (routingAction.responsibleRoutableIndex == 1
-                            && routingAction.segmentToBePopped.id == counterSegmentId) {
-                        action1Correct = true
-                    }
-                }
-                is change -> {
-                    if (routingAction.responsibleRoutableIndex == 0
-                            && routingAction.segmentToBeReplaced.id == mainSegmentId
-                            && routingAction.newSegment.id == statsSegmentId) {
-                        action2Correct = true
-                    }
-                }
-            }
-        }
+        val change = routingActions.find { it is Change } as? Change
+        val pop = routingActions.find { it is Pop } as? Pop
 
-        assertThat(action1Correct).isTrue()
-        assertThat(action2Correct).isTrue()
-        assertThat(routingActions.count()).isEqualTo(2)
+        change.shouldNotBeNull()
+        change.routableIndex shouldEqual 0
+        change.segmentTeReplace shouldHaveId root
+        change.newSegment shouldHaveId stats
+
+        pop.shouldNotBeNull()
+        pop.routableIndex shouldEqual 1
+        pop.segmentToPop shouldHaveId counter
     }
 
     @Test
@@ -181,84 +129,79 @@ internal class ReKotlinRouterSpec {
         val oldRoute: Route = emptyList()
         val newRoute: Route = emptyList()
         // When
-        val routingActions = Router.routingActionsForTransitionFrom(oldRoute, newRoute)
+        val routingActions = routingActionsForTransitionFrom(oldRoute, newRoute)
 
         // Then
-        assertThat(routingActions.count()).isEqualTo(0)
+        routingActions.count() shouldEqual 0
     }
 
     @Test
     fun `should calculate no actions for transitions between identical, non-empty routes`() {
 
         // Given
-        val oldRoute = simpleRoute(mainSegmentId, counterSegmentId)
-        val newRoute = simpleRoute(mainSegmentId, counterSegmentId)
+        val oldRoute = simpleRoute(root, counter)
+        val newRoute = simpleRoute(root, counter)
 
         // When
-        val routingActions = Router.routingActionsForTransitionFrom(oldRoute, newRoute)
+        val routingActions = routingActionsForTransitionFrom(oldRoute, newRoute)
 
         // Then
-        assertThat(routingActions.count()).isEqualTo(0)
+        routingActions.count() shouldEqual 0
     }
 
     @Test
     fun `should calculate transitions with multiple pops`() {
 
         // Given
-        val oldRoute = simpleRoute(mainSegmentId, statsSegmentId, counterSegmentId)
-        val newRoute = simpleRoute(mainSegmentId)
+        val oldRoute = simpleRoute(root, stats, counter)
+        val newRoute = simpleRoute(root)
 
         // When
-        val routingActions = Router.routingActionsForTransitionFrom(oldRoute, newRoute)
+        val routingActions = routingActionsForTransitionFrom(oldRoute, newRoute)
 
         // Then
-        var action1Correct = false
-        var action2Correct = false
-        routingActions.forEach { routingAction ->
-            when (routingAction) {
-                is pop -> {
-                    if (routingAction.responsibleRoutableIndex == 2 && routingAction.segmentToBePopped.id == counterSegmentId) {
-                        action1Correct = true
-                    }
-                    if (routingAction.responsibleRoutableIndex == 1 && routingAction.segmentToBePopped.id == statsSegmentId) {
-                        action2Correct = true
-                    }
-                }
-            }
+        routingActions.count() shouldEqual 2
+
+        val pops = routingActions.filter { it is Pop }.map { it as Pop }
+
+        pops.count() shouldEqual 2
+
+        pops[0].run {
+            routableIndex shouldEqual 2
+            segmentToPop shouldHaveId counter
         }
-        assertThat(action1Correct).isTrue()
-        assertThat(action2Correct).isTrue()
-        assertThat(routingActions.count()).isEqualTo(2)
+
+        pops[1].run {
+            routableIndex shouldEqual 1
+            segmentToPop shouldHaveId stats
+        }
     }
 
     @Test
     fun `should calculate transitions with multiple pushes`() {
 
         // Given
-        val oldRoute = simpleRoute(mainSegmentId)
-        val newRoute = simpleRoute(mainSegmentId, statsSegmentId, counterSegmentId)
+        val oldRoute = simpleRoute(root)
+        val newRoute = simpleRoute(root, stats, counter)
 
         // When
-        val routingActions = Router.routingActionsForTransitionFrom(oldRoute, newRoute)
+        val routingActions = routingActionsForTransitionFrom(oldRoute, newRoute)
 
         // Then
-        var action1Correct = false
-        var action2Correct = false
-        routingActions.forEach { routingAction ->
-            when (routingAction) {
-                is push -> {
-                    if (routingAction.responsibleRoutableIndex == 1 && routingAction.segmentToBePushed.id == statsSegmentId) {
-                        action1Correct = true
-                    }
-                    if (routingAction.responsibleRoutableIndex == 2 && routingAction.segmentToBePushed.id == counterSegmentId) {
-                        action2Correct = true
-                    }
+        routingActions.count() shouldEqual 2
 
-                }
-            }
+        val pushes = routingActions.filter { it is Push }.map { it as Push }
+
+        pushes.count() shouldEqual 2
+
+        pushes[0].run {
+            routableIndex shouldEqual 1
+            segmentToPush shouldHaveId stats
         }
-        assertThat(action1Correct).isTrue()
-        assertThat(action2Correct).isTrue()
-        assertThat(routingActions.count()).isEqualTo(2)
+
+        pushes[1].run {
+            routableIndex shouldEqual 2
+            segmentToPush shouldHaveId counter
+        }
     }
 }

@@ -1,26 +1,21 @@
 package org.rekotlinrouter
 
-/**
- * Created by Mohanraj Karatadipalayam on 28/09/17.
- */
-
 import android.os.Handler
-import android.os.Looper
-import org.assertj.core.api.Assertions.assertThat
-import org.awaitility.Awaitility.await
+import org.amshove.kluent.shouldBeFalse
+import org.amshove.kluent.shouldBeTrue
+import org.amshove.kluent.shouldEqual
+import org.amshove.kluent.shouldNotBeNull
 import org.junit.Before
 import org.junit.Test
-import org.junit.runner.RunWith
-import org.powermock.core.classloader.annotations.PrepareForTest
-import org.powermock.modules.junit4.PowerMockRunner
+import org.mockito.Matchers.any
+import org.mockito.Mockito.`when`
+import org.mockito.Mockito.mock
 import org.rekotlin.Action
 import org.rekotlin.StateType
 import org.rekotlin.Store
-import java.util.concurrent.TimeUnit
+import org.rekotlin.Subscription
 
-class FakeAppState : StateType {
-    var navigationState = NavigationState()
-}
+class FakeAppState(var navigationState: NavigationState = NavigationState()) : StateType
 
 fun appReducer(action: Action, state: FakeAppState?): FakeAppState {
     val fakeAppState = FakeAppState()
@@ -28,307 +23,208 @@ fun appReducer(action: Action, state: FakeAppState?): FakeAppState {
     return fakeAppState
 }
 
-class MockRoutable : Routable {
+fun selectNavigationState(subscription: Subscription<FakeAppState>): Subscription<NavigationState> =
+        subscription.select { stateType -> stateType.navigationState }
 
-    var callsToPushRouteSegment: Array<Pair<RouteSegment, Boolean>> = emptyArray()
-    var callsToPopRouteSegment: Array<Pair<RouteSegment, Boolean>> = emptyArray()
-    var callsToChangeRouteSegment: Array<Triple<RouteSegment, RouteSegment, Boolean>> = emptyArray()
-
-    override fun pushRouteSegment(routeSegment: RouteSegment, animated: Boolean, completionHandler: () -> Unit): Routable {
-        callsToPushRouteSegment = callsToPushRouteSegment.plus(Pair(routeSegment, animated))
-        completionHandler()
-        return MockRoutable()
-    }
-
-    override fun popRouteSegment(routeSegment: RouteSegment, animated: Boolean, completionHandler: () -> Unit) {
-        callsToPopRouteSegment = callsToPopRouteSegment.plus(Pair(routeSegment, animated))
-        completionHandler()
-    }
+class FakeRoutable(
+        private val pop: (RouteSegment, Boolean, () -> Unit) -> Unit = { _, _, _ -> },
+        private val change: (RouteSegment, RouteSegment, Boolean, () -> Unit) -> Unit = { _, _, _, _ -> },
+        private val push: (RouteSegment, Boolean, () -> Unit) -> Unit = { _, _, _ -> },
+        private val childRoutable: Routable? = null
+) : Routable {
+    override fun popRouteSegment(routeSegment: RouteSegment, animated: Boolean, completionHandler: () -> Unit) =
+            pop(routeSegment, animated, completionHandler)
 
     override fun changeRouteSegment(from: RouteSegment, to: RouteSegment, animated: Boolean, completionHandler: () -> Unit): Routable {
-        callsToChangeRouteSegment = callsToChangeRouteSegment.plus(Triple(from, to, animated))
-        completionHandler()
-        return MockRoutable()
+        change(from, to, animated, completionHandler)
+        return childRoutable ?: this
+    }
+
+    override fun pushRouteSegment(routeSegment: RouteSegment, animated: Boolean, completionHandler: () -> Unit): Routable {
+        push(routeSegment, animated, completionHandler)
+        return childRoutable ?: this
     }
 }
 
+fun fakeTestHandler(): Handler {
+    val fakeHandler = mock(android.os.Handler::class.java)
+    `when`(fakeHandler.post(any(Runnable::class.java))).thenAnswer { invocation ->
+        (invocation.arguments[0] as Runnable).run()
+        null
+    }
+    return fakeHandler
+}
 
-@PrepareForTest(Looper::class)
-@RunWith(PowerMockRunner::class)
 class RoutingCallTest {
 
-    var store: Store<FakeAppState> = Store(reducer = ::appReducer, state = FakeAppState())
-
-    @Before
-    @PrepareForTest(Looper::class, Handler::class, Router::class)
-    fun initTest() {
-        store = Store(reducer = ::appReducer, state = FakeAppState())
-        AndroidMockUtil.mockMainThreadHandler()
-    }
+    private val store: Store<FakeAppState> = Store(reducer = ::appReducer, state = FakeAppState())
+    private val fakeHandler: Handler = fakeTestHandler()
 
     @Test
-    fun should_not_request_the_main_activity_when_no_route_is_provided() {
-
-        class FakeRootRoutable : Routable {
-            var pushRouteIsCalled = false
-
-            override fun pushRouteSegment(routeSegment: RouteSegment, animated: Boolean, completionHandler: () -> Unit): Routable {
-                pushRouteIsCalled = true
-                return MockRoutable()
-            }
-
-            override fun popRouteSegment(routeSegment: RouteSegment, animated: Boolean, completionHandler: () -> Unit) {}
-
-            override fun changeRouteSegment(from: RouteSegment, to: RouteSegment, animated: Boolean, completionHandler: () -> Unit) = this
-        }
-
+    fun `should not push route segment when no route is dispatched`() {
         // Given
-        val routable = FakeRootRoutable()
+        var pushRouteCalled = false
+        val routable = FakeRoutable(push = { _, _, _ -> pushRouteCalled = true })
+
         // When
-        Router(store, routable) { subscription ->
-            subscription.select { stateType -> stateType.navigationState }
-        }
+        Router(store, routable, ::selectNavigationState, fakeHandler)
+
         // Then
-        assertThat(routable.pushRouteIsCalled).isFalse()
+        pushRouteCalled.shouldBeFalse()
     }
 
     @Test
-    fun should_request_the_root_with_identifier_when_an_initial_route_is_provided() {
+    fun `should push route segment with identifier to root when an initial route is dispatched`() {
+        // Given
+        var pushedSegment: RouteSegment? = null
+        val routable = FakeRoutable(push = { segment, _, _ -> pushedSegment = segment })
+
+        val action = SetRouteAction(simpleRoute("root"))
+        store.dispatch(action)
+
+        // when
+        Router(store, routable, ::selectNavigationState, fakeHandler)
+
+        // Then
+        pushedSegment.shouldNotBeNull()
+        pushedSegment!!.id shouldEqual "root"
+    }
+
+    @Test
+    fun `should push root and child segment when a set route 2 segments is dispatched`() {
 
         // Given
-
-        // The below syntax is not supported by powermock 😟
-        // store.dispatch(SetRouteAction(arrayOf("MainActivity")))
-        // https://github.com/powermock/powermock/issues/779
-        // Until then
-        val actionArray = simpleRoute("MainActivity")
+        val actionArray = simpleRoute("root", "child")
         val action = SetRouteAction(actionArray)
         store.dispatch(action)
 
-        class FakeRootRoutable(val calledWithIdentifier: (RouteSegment?) -> Any) : Routable {
-            var pushRouteIsCalled = false
+        var rootSegment: RouteSegment? = null
+        var childSegment: RouteSegment? = null
 
-            override fun pushRouteSegment(routeSegment: RouteSegment,
-                                          animated: Boolean,
-                                          completionHandler: () -> Unit): Routable {
-                calledWithIdentifier(routeSegment)
-                completionHandler()
-                pushRouteIsCalled = true
-                return MockRoutable()
-            }
+        val child = FakeRoutable(
+                push = { segment, _, _ -> childSegment = segment }
+        )
 
-            override fun popRouteSegment(routeSegment: RouteSegment, animated: Boolean, completionHandler: () -> Unit) {}
+        val root = FakeRoutable(
+                push = { segment, _, _ -> rootSegment = segment },
+                childRoutable = child
+        )
 
-            override fun changeRouteSegment(from: RouteSegment, to: RouteSegment, animated: Boolean, completionHandler: () -> Unit) = this
-        }
+        // When
+        Router(store, root, ::selectNavigationState, fakeHandler)
 
         // Then
-
-        await().atMost(5, TimeUnit.SECONDS).untilAsserted {
-            Runnable {
-                var isRootElementCalled = false
-                val rootRoutable = FakeRootRoutable { rootSegment: RouteSegment? ->
-                    {
-                        isRootElementCalled = rootSegment?.id.equals("MainActivity")
-                    }
-                }
-
-                Router(store = store, rootRoutable = rootRoutable) { subscription ->
-                    subscription.select { stateType -> stateType.navigationState }
-                }
-                println("The value of isRootElementCalled is $isRootElementCalled")
-                assertThat(isRootElementCalled).isTrue()
-            }
-        }
-    }
-
-    @Test
-    fun should_call_push_on_the_root_for_a_route_with_two_elements() {
-
-        val actionArray = simpleRoute("MainActivity", "SecondActivity")
-        val action = SetRouteAction(actionArray)
-        store.dispatch(action)
-
-        class FakeChildRoutable(var calledWithIdentifier: (RouteSegment?) -> Any) : Routable {
-            var pushRouteIsCalled = false
-
-            override fun pushRouteSegment(routeSegment: RouteSegment,
-                                          animated: Boolean,
-                                          completionHandler: () -> Unit): Routable {
-                calledWithIdentifier(routeSegment)
-                completionHandler()
-                pushRouteIsCalled = true
-                return MockRoutable()
-            }
-
-            override fun popRouteSegment(routeSegment: RouteSegment, animated: Boolean, completionHandler: () -> Unit) {}
-
-            override fun changeRouteSegment(from: RouteSegment, to: RouteSegment, animated: Boolean, completionHandler: () -> Unit) = this
-        }
-
-        class FakeRootRoutable(var injectedRoutable: Routable) : Routable {
-            var pushRouteIsCalled = false
-            var rootRoutableIsCorrect = false
-            var routeRootElementIdentifier = RouteSegment("")
-
-            override fun pushRouteSegment(routeSegment: RouteSegment,
-                                          animated: Boolean,
-                                          completionHandler: () -> Unit): Routable {
-                completionHandler()
-                pushRouteIsCalled = true
-
-                rootRoutableIsCorrect = routeSegment.id == "MainActivity"
-                return injectedRoutable
-            }
-
-            override fun popRouteSegment(routeSegment: RouteSegment, animated: Boolean, completionHandler: () -> Unit) {}
-
-            override fun changeRouteSegment(from: RouteSegment, to: RouteSegment, animated: Boolean, completionHandler: () -> Unit) = this
-        }
-
-        // Then
-
-        await().atMost(5, TimeUnit.SECONDS).untilAsserted {
-            object : Runnable {
-
-
-                override fun run() {
-                    var isChildIdentifierCorrect = false
-                    val fakeChildRoutable = FakeChildRoutable { calledWithIdentifier: RouteSegment? ->
-                        {
-                            isChildIdentifierCorrect = calledWithIdentifier?.id.equals("SecondActivity")
-                        }
-                    }
-
-                    val fakeRootRoutable = FakeRootRoutable(injectedRoutable = fakeChildRoutable)
-
-                    Router(store = store, rootRoutable = fakeRootRoutable) { subscription ->
-                        subscription.select { stateType -> stateType.navigationState }
-                    }
-                    println("The value of isIdentifierCorrect is $isChildIdentifierCorrect")
-                    println("The value of rootRouteElementIdentifier is ${fakeRootRoutable.routeRootElementIdentifier}")
-                    // Then
-                    // Assert
-                    assertThat(isChildIdentifierCorrect && fakeRootRoutable.rootRoutableIsCorrect).isTrue()
-                }
-            }
-        }
+        rootSegment shouldHaveId "root"
+        childSegment shouldHaveId "child"
     }
 }
 
-@PrepareForTest(Looper::class, Handler::class)
-@RunWith(PowerMockRunner::class)
-class RoutingSpecificDataTest {
+class RouteArgsSpec {
+    private val store: Store<FakeAppState> = Store(reducer = ::appReducer, state = null)
 
-    var store: Store<FakeAppState> = Store(reducer = ::appReducer, state = null)
+    @Test
+    fun `should pass route args to push when set via SetRouteAction`() {
+        //Given
+        var pushedSegment: RouteSegment? = null
+        val routable = FakeRoutable(
+                push = { segment, _, _ -> pushedSegment = segment }
+        )
+        Router(store, routable, ::selectNavigationState, fakeTestHandler())
 
-    @Before
-    @PrepareForTest(Looper::class)
-    fun initTest() {
-        store = Store(reducer = ::appReducer, state = null)
-        AndroidMockUtil.mockMainThreadHandler()
+        // When
+        val action = SetRouteAction(route("main" to 1))
+        store.dispatch(action)
+
+        // Then
+        pushedSegment shouldHaveArgs 1
     }
 
     @Test
-    fun should_allow_accessing_the_data_when_providing_the_expected_type() {
-
+    fun `should pass route args to segment routables for longer route`() {
         //Given
+        var rootSegment: RouteSegment? = null
+        var childSegment: RouteSegment? = null
+        var grandChildSegment: RouteSegment? = null
 
-        val actionArray = simpleRoute("MainActivity", "SecondActivity")
-        val actionData = SetRouteSpecificData(route = actionArray, data = "UserID_10")
+        val grandChildRoutable = FakeRoutable(
+                push = { segment, _, _ -> grandChildSegment = segment }
+        )
+        val childRoutable = FakeRoutable(
+                push = { segment, _, _ -> childSegment = segment },
+                childRoutable = grandChildRoutable
+        )
+        val routable = FakeRoutable(
+                push = { segment, _, _ -> rootSegment = segment },
+                childRoutable = childRoutable
+        )
+
+        Router(store, routable, ::selectNavigationState, fakeTestHandler())
+
         // When
-        store.dispatch(actionData)
+        val action = SetRouteAction(route(
+                "root" to 1,
+                "child" to 2,
+                "grandchild" to 3
+        ))
+        store.dispatch(action)
 
         // Then
-        val data: String? = store.state.navigationState.getRouteSpecificState(actionArray)
+        rootSegment shouldHaveArgs 1
+        childSegment shouldHaveArgs 2
+        grandChildSegment shouldHaveArgs 3
+    }
+}
 
-        await().atMost(5, TimeUnit.SECONDS).untilAsserted {
-            Runnable {
-                // Assert
-                assertThat(data).isEqualTo("UserID_10")
-            }
-        }
+class RoutingAnimationTest {
+
+    private val store: Store<FakeAppState> = Store(reducer = ::appReducer, state = null)
+    private val animated: MutableList<Boolean> = mutableListOf()
+
+    @Before
+    fun setup() {
+        val routable = FakeRoutable(
+                push = { _, a, _ -> animated.add(a) }
+        )
+
+        Router(store, routable, ::selectNavigationState, fakeTestHandler())
     }
 
-    @PrepareForTest(Looper::class, Handler::class, Router::class)
-    @RunWith(PowerMockRunner::class)
-    class RoutingAnimationTest {
 
-        var store: Store<FakeAppState> = Store(reducer = ::appReducer, state = null)
-        var mockRoutable: MockRoutable = MockRoutable()
-        var router: Router<FakeAppState>? = null
+    @Test
+    fun `should push animated when dispatch route change with animate as true`() {
+        //Given
+        val actionArray = simpleRoute("root", "child")
+        val action = SetRouteAction(actionArray, animated = true)
 
-        @Before
-        @PrepareForTest(Looper::class, Handler::class, Router::class)
-        fun initTest() {
-            AndroidMockUtil.mockMainThreadHandler()
-            store = Store(reducer = ::appReducer, state = null)
-            mockRoutable = MockRoutable()
+        // When
+        store.dispatch(action)
 
-            router = Router(store = store,
-                    rootRoutable = mockRoutable) { subscription ->
-                subscription.select { stateType ->
-                    stateType.navigationState
-                }
-            }
-        }
+        // Then
+        animated.forEach { it.shouldBeTrue() }
+    }
 
-        @Test
-        fun should_request_animation_when_dispatch_route_change_with_animate_as_true() {
-            //Given
-            val actionArray = simpleRoute("MainActivity", "SecondActivity")
-            val action = SetRouteAction(actionArray, animated = true)
+    @Test
+    fun `should not push animation when route change with animate is false`() {
+        //Given
+        val actionArray = simpleRoute("root", "child")
+        val action = SetRouteAction(actionArray, animated = false)
+        // When
+        store.dispatch(action)
 
-            // When
-            store.dispatch(action)
+        // Then
+        animated.forEach { it.shouldBeFalse() }
+    }
 
-            // Then
-            await().atMost(5, TimeUnit.SECONDS).untilAsserted {
-                object : Runnable {
-                    @PrepareForTest(Looper::class, Handler::class)
-                    override fun run() {
-                        // Assert
-                        assertThat(mockRoutable.callsToPushRouteSegment.last().second).isTrue()
-                    }
-                }
-            }
-        }
+    @Test
+    fun `should push animation by default`() {
+        //Given
 
-        @Test
-        fun should_not_request_animation_when_route_change_with_animate_is_false() {
-            //Given
-            val actionArray = simpleRoute("MainActivity", "SecondActivity")
-            val action = SetRouteAction(actionArray, animated = false)
-            // When
-            store.dispatch(action)
+        val actionArray = simpleRoute("root", "child")
+        val action = SetRouteAction(actionArray)
+        // When
+        store.dispatch(action)
 
-            // Then
-
-            await().atMost(5, TimeUnit.SECONDS).untilAsserted {
-                Runnable {
-                    // Assert
-                    assertThat(mockRoutable.callsToPushRouteSegment.last().second).isFalse()
-                }
-            }
-        }
-
-        @Test
-        fun should_request_animation_by_default() {
-            //Given
-
-            val actionArray = simpleRoute("MainActivity", "SecondActivity")
-            val action = SetRouteAction(actionArray)
-            // When
-            store.dispatch(action)
-
-            // Then
-
-            await().atMost(5, TimeUnit.SECONDS).untilAsserted {
-                Runnable {
-                    // Assert
-                    assertThat(mockRoutable.callsToPushRouteSegment.last().second).isTrue()
-                }
-            }
-        }
+        // Then
+        animated.forEach { it.shouldBeTrue() }
     }
 }

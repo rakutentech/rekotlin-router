@@ -1,10 +1,7 @@
 package org.rekotlinrouter
 
-
 typealias Route = List<RouteSegment>
-
 data class RouteSegment(val id: String, val args: Any? = null)
-
 
 interface Routable {
 

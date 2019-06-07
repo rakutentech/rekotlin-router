@@ -2,6 +2,22 @@ package org.rekotlinrouter
 
 import org.rekotlin.Action
 
+// State
+
+data class NavigationState(val route: Route = emptyList(),
+                           val animated: Boolean = true)
+
+@Suppress("unused") // part of public API
+interface HasNavigationState {
+    var navigationState: NavigationState
+}
+
+// Action
+
+data class SetRouteAction(val route: Route, val animated: Boolean = true) : Action
+
+// Reducer
+
 /**
 The navigationReducer handles the state slice concerned with storing the current navigation
 information. Note, that this reducer is **not** a *top-level* reducer, you need to use it within
@@ -14,12 +30,8 @@ fun navigationReducer(action: Action, oldState: NavigationState?): NavigationSta
     return when (action) {
         is SetRouteAction -> state.copy(
                 route = action.route,
-                changeRouteAnimated = action.animated
+                animated = action.animated
         )
-        is SetRouteSpecificData -> {
-            state.routeSpecificState[action.route.routeString] = action.data
-            state
-        }
         else -> state
     }
 }
