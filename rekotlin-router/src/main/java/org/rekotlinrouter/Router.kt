@@ -3,7 +3,7 @@ package org.rekotlinrouter
 import android.os.Handler
 import android.os.Looper
 import org.rekotlin.StateType
-import org.rekotlin.Store
+import org.rekotlin.StoreType
 import org.rekotlin.StoreSubscriber
 import org.rekotlin.Subscription
 
@@ -30,7 +30,7 @@ internal data class Change(
 // public router
 
 class Router<routerStateType : StateType>(
-        var store: Store<routerStateType>,
+        var store: StoreType<routerStateType>,
         rootRoutable: Routable,
         stateTransform: (Subscription<routerStateType>) -> Subscription<NavigationState>,
         private val mainThreadHandler: Handler = Handler(Looper.getMainLooper()) // for testing
