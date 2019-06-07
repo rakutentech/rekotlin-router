@@ -7,11 +7,6 @@ import org.rekotlin.Action
 data class NavigationState(val route: Route = Route(),
                            val animated: Boolean = true)
 
-@Suppress("unused") // part of public API
-interface HasNavigationState {
-    var navigationState: NavigationState
-}
-
 // Action
 
 data class SetRouteAction(val route: Route, val animated: Boolean = true) : Action
