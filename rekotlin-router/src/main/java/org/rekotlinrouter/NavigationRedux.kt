@@ -4,7 +4,7 @@ import org.rekotlin.Action
 
 // State
 
-data class NavigationState(val route: Route = emptyList(),
+data class NavigationState(val route: Route = Route(),
                            val animated: Boolean = true)
 
 @Suppress("unused") // part of public API

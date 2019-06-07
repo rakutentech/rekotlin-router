@@ -79,7 +79,7 @@ class RoutingCallTest {
         var pushedSegment: RouteSegment? = null
         val routable = FakeRoutable(push = { segment, _, _ -> pushedSegment = segment })
 
-        val action = SetRouteAction(simpleRoute("root"))
+        val action = SetRouteAction(Route("root"))
         store.dispatch(action)
 
         // when
@@ -94,8 +94,7 @@ class RoutingCallTest {
     fun `should push root and child segment when a set route 2 segments is dispatched`() {
 
         // Given
-        val actionArray = simpleRoute("root", "child")
-        val action = SetRouteAction(actionArray)
+        val action = SetRouteAction(Route("root", "child"))
         store.dispatch(action)
 
         var rootSegment: RouteSegment? = null
@@ -132,7 +131,7 @@ class RouteArgsSpec {
         Router(store, routable, ::selectNavigationState, fakeTestHandler())
 
         // When
-        val action = SetRouteAction(route("main" to 1))
+        val action = SetRouteAction(Route("main" to 1))
         store.dispatch(action)
 
         // Then
@@ -161,7 +160,7 @@ class RouteArgsSpec {
         Router(store, routable, ::selectNavigationState, fakeTestHandler())
 
         // When
-        val action = SetRouteAction(route(
+        val action = SetRouteAction(Route(
                 "root" to 1,
                 "child" to 2,
                 "grandchild" to 3
@@ -193,7 +192,7 @@ class RoutingAnimationTest {
     @Test
     fun `should push animated when dispatch route change with animate as true`() {
         //Given
-        val actionArray = simpleRoute("root", "child")
+        val actionArray = Route("root", "child")
         val action = SetRouteAction(actionArray, animated = true)
 
         // When
@@ -206,7 +205,7 @@ class RoutingAnimationTest {
     @Test
     fun `should not push animation when route change with animate is false`() {
         //Given
-        val actionArray = simpleRoute("root", "child")
+        val actionArray = Route("root", "child")
         val action = SetRouteAction(actionArray, animated = false)
         // When
         store.dispatch(action)
@@ -219,7 +218,7 @@ class RoutingAnimationTest {
     fun `should push animation by default`() {
         //Given
 
-        val actionArray = simpleRoute("root", "child")
+        val actionArray = Route("root", "child")
         val action = SetRouteAction(actionArray)
         // When
         store.dispatch(action)

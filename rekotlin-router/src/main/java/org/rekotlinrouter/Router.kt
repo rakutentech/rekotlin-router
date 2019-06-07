@@ -36,7 +36,7 @@ class Router<routerStateType : StateType>(
         private val mainThreadHandler: Handler = Handler(Looper.getMainLooper()) // for testing
 ) : StoreSubscriber<NavigationState> {
 
-    private var previousRoute: Route = emptyList()
+    private var previousRoute: Route = Route()
 
     // TODO: Collections.synchronizedList vs CopyOnWriteArrayList
     // var routables: List<Routable> = Collections.synchronizedList(arrayListOf<Routable>())
@@ -90,8 +90,8 @@ class Router<routerStateType : StateType>(
 private fun largestCommonSubroute(oldRoute: Route, newRoute: Route): Int {
     var largestCommonSubroute = -1
 
-    while (largestCommonSubroute + 1 < newRoute.count() &&
-            largestCommonSubroute + 1 < oldRoute.count() &&
+    while (largestCommonSubroute + 1 < newRoute.count &&
+            largestCommonSubroute + 1 < oldRoute.count &&
             newRoute[largestCommonSubroute + 1] == oldRoute[largestCommonSubroute + 1]) {
         largestCommonSubroute += 1
     }
@@ -113,12 +113,12 @@ internal fun routingActionsForTransitionFrom(oldRoute: Route, newRoute: Route): 
     // Find the last common subroute between two routes
     val commonSubroute = largestCommonSubroute(oldRoute, newRoute)
 
-    if (commonSubroute == oldRoute.count() - 1 && commonSubroute == newRoute.count() - 1) {
+    if (commonSubroute == oldRoute.count - 1 && commonSubroute == newRoute.count - 1) {
         return arrayListOf()
     }
     // Keeps track which element of the routes we are working on
     // We start at the end of the old route
-    var routeBuildingIndex = oldRoute.count() - 1
+    var routeBuildingIndex = oldRoute.count - 1
 
     // Pop all route segments of the old route that are no longer in the new route
     // Stop one element ahead of the commonSubroute. When we are one element ahead of the
@@ -142,8 +142,8 @@ internal fun routingActionsForTransitionFrom(oldRoute: Route, newRoute: Route): 
     // This is the 3. case:
     // "The new route has a different element after the commonSubroute, we need to replace
     //  the old route element with the new one"
-    if ((oldRoute.count() > (commonSubroute + 1))
-            && (newRoute.count() > (commonSubroute + 1))) {
+    if ((oldRoute.count > (commonSubroute + 1))
+            && (newRoute.count > (commonSubroute + 1))) {
         val changeAction = Change(routableIndexForRouteSegment(commonSubroute),
                 oldRoute[commonSubroute + 1],
                 newRoute[commonSubroute + 1])
@@ -153,7 +153,7 @@ internal fun routingActionsForTransitionFrom(oldRoute: Route, newRoute: Route): 
     // This is the 1. case:
     // "The old route had an element after the commonSubroute and the new route does not
     //  we need to pop the route segment after the commonSubroute"
-    else if (oldRoute.count() > newRoute.count()) {
+    else if (oldRoute.count > newRoute.count) {
         val popAction = Pop(routableIndexForRouteSegment(routeBuildingIndex - 1),
                 oldRoute[routeBuildingIndex])
 
@@ -166,7 +166,7 @@ internal fun routingActionsForTransitionFrom(oldRoute: Route, newRoute: Route): 
     // the 2. case:
     // "The old route had no element after the commonSubroute and the new route does,
     //  we need to push the route segment(s) after the commonSubroute"
-    val newRouteIndex = newRoute.count() - 1
+    val newRouteIndex = newRoute.count - 1
 
     while (routeBuildingIndex < newRouteIndex) {
         val routeSegmentToPush = newRoute[routeBuildingIndex + 1]

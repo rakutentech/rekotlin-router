@@ -111,18 +111,18 @@ Here is the `Routable` protocol with the methods you should implement:
 ```Kotlin
 interface Routable {
 
-    fun pushRouteSegment(routeElementIdentifier: RouteElementIdentifier,
+    fun pushRouteSegment(RouteSegment: RouteSegment,
                          animated: Boolean,
-                         completionHandler: RoutingCompletionHandler): Routable
+                         completionHandler: () -> Unit): Routable
 
-    fun popRouteSegment(routeElementIdentifier: RouteElementIdentifier,
+    fun popRouteSegment(RouteSegment: RouteSegment,
                         animated: Boolean,
-                        completionHandler: RoutingCompletionHandler)
+                        completionHandler: () -> Unit)
 
-    fun changeRouteSegment(from: RouteElementIdentifier,
-                           to: RouteElementIdentifier,
+    fun changeRouteSegment(from: RouteSegment,
+                           to: RouteSegment,
                            animated: Boolean,
-                           completionHandler: RoutingCompletionHandler): Routable
+                           completionHandler: () -> Unit): Routable
 }
 ```
 
@@ -138,27 +138,27 @@ If your navigation stack uses a modal presentation for this transition, the impl
 ```Kotlin
 
 class RootRoutable(val context: Context): Routable {
-    override fun popRouteSegment(routeElementIdentifier: RouteElementIdentifier,
+    override fun popRouteSegment(RouteSegment: RouteSegment,
                                  animated: Boolean,
-                                 completionHandler: RoutingCompletionHandler) {
+                                 completionHandler: () -> Unit) {
     }
 
-    override fun pushRouteSegment(routeElementIdentifier: RouteElementIdentifier,
+    override fun pushRouteSegment(RouteSegment: RouteSegment,
                                   animated: Boolean,
-                                  completionHandler: RoutingCompletionHandler): Routable {
-        if(routeElementIdentifier == loginRoute) {
+                                  completionHandler: () -> Unit): Routable {
+        if(RouteSegment == loginRoute) {
             return LoginRoutable(context)
-        } else if (routeElementIdentifier == welcomeRoute) {
+        } else if (RouteSegment == welcomeRoute) {
             return RoutableHelper.createWelcomeRoutable(context)
         }
 
         return LoginRoutable(context)
     }
 
-    override fun changeRouteSegment(from: RouteElementIdentifier,
-                                    to: RouteElementIdentifier,
+    override fun changeRouteSegment(from: RouteSegment,
+                                    to: RouteSegment,
                                     animated: Boolean,
-                                    completionHandler: RoutingCompletionHandler): Routable {
+                                    completionHandler: () -> Unit): Routable {
        TODO("not implemented")
     }
 

@@ -16,8 +16,8 @@ internal class ReKotlinRouterSpec {
     @Test
     fun `should calculate transitions from an empty route to a multi segment route`() {
         // Given
-        val oldRoute: Route = emptyList()
-        val newRoute = simpleRoute(root, stats)
+        val oldRoute = Route()
+        val newRoute = Route(root, stats)
 
         // When
         val routingActions = routingActionsForTransitionFrom(oldRoute, newRoute)
@@ -38,8 +38,8 @@ internal class ReKotlinRouterSpec {
     @Test
     fun `should generate a change action on the last common subroute`() {
         // Given
-        val oldRoute = simpleRoute(root, counter)
-        val newRoute = simpleRoute(root, stats)
+        val oldRoute = Route(root, counter)
+        val newRoute = Route(root, stats)
 
         // When
         val routingActions = routingActionsForTransitionFrom(oldRoute, newRoute)
@@ -56,8 +56,8 @@ internal class ReKotlinRouterSpec {
     @Test
     fun `should generate a Change action on the last common subroute, also for routes of different length`() {
         // Given
-        val oldRoute = simpleRoute(root, counter)
-        val newRoute = simpleRoute(root, stats, info)
+        val oldRoute = Route(root, counter)
+        val newRoute = Route(root, stats, info)
 
         // When
         val routingActions = routingActionsForTransitionFrom(oldRoute, newRoute)
@@ -81,8 +81,8 @@ internal class ReKotlinRouterSpec {
     @Test
     fun `should generate a Change action on root when root element changes`() {
         // Given
-        val oldRoute = simpleRoute(root)
-        val newRoute = simpleRoute(stats)
+        val oldRoute = Route(root)
+        val newRoute = Route(stats)
 
         // When
         val routingActions = routingActionsForTransitionFrom(oldRoute, newRoute)
@@ -101,8 +101,8 @@ internal class ReKotlinRouterSpec {
     @Test
     fun `should generate a pop action followed by a change action on root when whole route changes`() {
         // Given
-        val oldRoute = simpleRoute(root, counter)
-        val newRoute = simpleRoute(stats)
+        val oldRoute = Route(root, counter)
+        val newRoute = Route(stats)
 
         // When
         val routingActions = routingActionsForTransitionFrom(oldRoute, newRoute)
@@ -126,8 +126,8 @@ internal class ReKotlinRouterSpec {
     @Test
     fun `should calculate no actions for transition from empty route to empty route`() {
         // Given
-        val oldRoute: Route = emptyList()
-        val newRoute: Route = emptyList()
+        val oldRoute = Route()
+        val newRoute = Route()
         // When
         val routingActions = routingActionsForTransitionFrom(oldRoute, newRoute)
 
@@ -139,8 +139,8 @@ internal class ReKotlinRouterSpec {
     fun `should calculate no actions for transitions between identical, non-empty routes`() {
 
         // Given
-        val oldRoute = simpleRoute(root, counter)
-        val newRoute = simpleRoute(root, counter)
+        val oldRoute = Route(root, counter)
+        val newRoute = Route(root, counter)
 
         // When
         val routingActions = routingActionsForTransitionFrom(oldRoute, newRoute)
@@ -153,8 +153,8 @@ internal class ReKotlinRouterSpec {
     fun `should calculate transitions with multiple pops`() {
 
         // Given
-        val oldRoute = simpleRoute(root, stats, counter)
-        val newRoute = simpleRoute(root)
+        val oldRoute = Route(root, stats, counter)
+        val newRoute = Route(root)
 
         // When
         val routingActions = routingActionsForTransitionFrom(oldRoute, newRoute)
@@ -181,8 +181,8 @@ internal class ReKotlinRouterSpec {
     fun `should calculate transitions with multiple pushes`() {
 
         // Given
-        val oldRoute = simpleRoute(root)
-        val newRoute = simpleRoute(root, stats, counter)
+        val oldRoute = Route(root)
+        val newRoute = Route(root, stats, counter)
 
         // When
         val routingActions = routingActionsForTransitionFrom(oldRoute, newRoute)
