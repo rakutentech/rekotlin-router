@@ -27,21 +27,21 @@ fun selectNavigationState(subscription: Subscription<FakeAppState>): Subscriptio
         subscription.select { stateType -> stateType.navigationState }
 
 class FakeRoutable(
-        private val pop: (RouteSegment, Boolean, () -> Unit) -> Unit = { _, _, _ -> },
-        private val change: (RouteSegment, RouteSegment, Boolean, () -> Unit) -> Unit = { _, _, _, _ -> },
-        private val push: (RouteSegment, Boolean, () -> Unit) -> Unit = { _, _, _ -> },
+        private val pop: (RouteSegment, Boolean) -> Unit = { _, _ -> },
+        private val change: (RouteSegment, RouteSegment, Boolean) -> Unit = { _, _, _ -> },
+        private val push: (RouteSegment, Boolean) -> Unit = { _, _ -> },
         private val childRoutable: Routable? = null
 ) : Routable {
-    override fun popRouteSegment(routeSegment: RouteSegment, animated: Boolean, completionHandler: () -> Unit) =
-            pop(routeSegment, animated, completionHandler)
+    override fun popRouteSegment(routeSegment: RouteSegment, animated: Boolean) =
+            pop(routeSegment, animated)
 
-    override fun changeRouteSegment(from: RouteSegment, to: RouteSegment, animated: Boolean, completionHandler: () -> Unit): Routable {
-        change(from, to, animated, completionHandler)
+    override fun changeRouteSegment(from: RouteSegment, to: RouteSegment, animated: Boolean): Routable {
+        change(from, to, animated)
         return childRoutable ?: this
     }
 
-    override fun pushRouteSegment(routeSegment: RouteSegment, animated: Boolean, completionHandler: () -> Unit): Routable {
-        push(routeSegment, animated, completionHandler)
+    override fun pushRouteSegment(routeSegment: RouteSegment, animated: Boolean): Routable {
+        push(routeSegment, animated)
         return childRoutable ?: this
     }
 }
@@ -55,7 +55,7 @@ fun fakeTestHandler(): Handler {
     return fakeHandler
 }
 
-class RoutingCallTest {
+class RoutingCallSpec {
 
     private val store: Store<FakeAppState> = Store(reducer = ::appReducer, state = FakeAppState())
     private val fakeHandler: Handler = fakeTestHandler()
@@ -64,7 +64,7 @@ class RoutingCallTest {
     fun `should not push route segment when no route is dispatched`() {
         // Given
         var pushRouteCalled = false
-        val routable = FakeRoutable(push = { _, _, _ -> pushRouteCalled = true })
+        val routable = FakeRoutable(push = { _, _ -> pushRouteCalled = true })
 
         // When
         Router(store, routable, ::selectNavigationState, fakeHandler)
@@ -77,7 +77,7 @@ class RoutingCallTest {
     fun `should push route segment with identifier to root when an initial route is dispatched`() {
         // Given
         var pushedSegment: RouteSegment? = null
-        val routable = FakeRoutable(push = { segment, _, _ -> pushedSegment = segment })
+        val routable = FakeRoutable(push = { segment, _ -> pushedSegment = segment })
 
         val action = SetRouteAction(Route("root"))
         store.dispatch(action)
@@ -101,11 +101,11 @@ class RoutingCallTest {
         var childSegment: RouteSegment? = null
 
         val child = FakeRoutable(
-                push = { segment, _, _ -> childSegment = segment }
+                push = { segment, _ -> childSegment = segment }
         )
 
         val root = FakeRoutable(
-                push = { segment, _, _ -> rootSegment = segment },
+                push = { segment, _ -> rootSegment = segment },
                 childRoutable = child
         )
 
@@ -126,7 +126,7 @@ class RouteArgsSpec {
         //Given
         var pushedSegment: RouteSegment? = null
         val routable = FakeRoutable(
-                push = { segment, _, _ -> pushedSegment = segment }
+                push = { segment, _ -> pushedSegment = segment }
         )
         Router(store, routable, ::selectNavigationState, fakeTestHandler())
 
@@ -146,14 +146,14 @@ class RouteArgsSpec {
         var grandChildSegment: RouteSegment? = null
 
         val grandChildRoutable = FakeRoutable(
-                push = { segment, _, _ -> grandChildSegment = segment }
+                push = { segment, _ -> grandChildSegment = segment }
         )
         val childRoutable = FakeRoutable(
-                push = { segment, _, _ -> childSegment = segment },
+                push = { segment, _ -> childSegment = segment },
                 childRoutable = grandChildRoutable
         )
         val routable = FakeRoutable(
-                push = { segment, _, _ -> rootSegment = segment },
+                push = { segment, _ -> rootSegment = segment },
                 childRoutable = childRoutable
         )
 
@@ -174,7 +174,7 @@ class RouteArgsSpec {
     }
 }
 
-class RoutingAnimationTest {
+class RoutingAnimationSpec {
 
     private val store: Store<FakeAppState> = Store(reducer = ::appReducer, state = null)
     private val animated: MutableList<Boolean> = mutableListOf()
@@ -182,7 +182,7 @@ class RoutingAnimationTest {
     @Before
     fun setup() {
         val routable = FakeRoutable(
-                push = { _, a, _ -> animated.add(a) }
+                push = { _, a -> animated.add(a) }
         )
 
         Router(store, routable, ::selectNavigationState, fakeTestHandler())
