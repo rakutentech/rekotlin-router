@@ -5,7 +5,7 @@ buildscript {
         dokka_version = '0.9.18'
         rekotlin_version = '1.0.3'
         gradle_bintray_plugin_version = '1.8.4'
-        android_tools_build_gradle_version = '3.4.1'
+        android_tools_build_gradle_version = '3.4.2'
         junit_version = '4.12'
         mockito_core_version = '2.28.2'
         androidx_version = '1.0.2'
